@@ -4,7 +4,7 @@ Base module for defining model.
 
 import pyfftw
 import numpy as np
-from spatial_statistics import cfl
+# from spatial_statistics import cfl
 from pathlib import Path
 fftw = pyfftw.interfaces.numpy_fft
 pyfftw.config.NUM_THREADS = 8
@@ -27,6 +27,7 @@ class Model:
         self.timestepper = timestepper
         self.data_dir = data_dir
         self._construct_grids()
+        self._create_data_dir()
 
     def _construct_grids(self):
         """Constructs spatial grids in real and Fourier space. Domain is
@@ -82,14 +83,14 @@ class Model:
         self.u = fftw.irfft2(self.uk)
         self.v = fftw.irfft2(self.vk)
 
-    def _check_cfl(self):
-        """
-        Assert that the CFL number is less than unity.
-        """
-        if self.timestepper.tn % 10 == 0:
-            self._update_fields()
-            self.cfl = cfl(self)
-            assert self.cfl < 1., "CFL condition violated."
+    # def _check_cfl(self):
+    #     """
+    #     Assert that the CFL number is less than unity.
+    #     """
+    #     if self.timestepper.tn % 10 == 0:
+    #         self._update_fields()
+    #         self.cfl = cfl(self)
+    #         assert self.cfl < 1., "CFL condition violated."
 
     def run(self):
         """Run model until final time.
