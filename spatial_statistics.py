@@ -6,7 +6,8 @@ TODO:
 """
 
 import numpy as np
-from model import Model
+if __name__ == "__main__":
+    from model import Model
 
 
 def spectral_variance(model, fk):

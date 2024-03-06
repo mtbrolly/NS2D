@@ -4,7 +4,7 @@ Base module for defining model.
 
 import pyfftw
 import numpy as np
-# from spatial_statistics import cfl
+from spatial_statistics import cfl
 from pathlib import Path
 fftw = pyfftw.interfaces.numpy_fft
 pyfftw.config.NUM_THREADS = 8
@@ -83,21 +83,21 @@ class Model:
         self.u = fftw.irfft2(self.uk)
         self.v = fftw.irfft2(self.vk)
 
-    # def _check_cfl(self):
-    #     """
-    #     Assert that the CFL number is less than unity.
-    #     """
-    #     if self.timestepper.tn % 10 == 0:
-    #         self._update_fields()
-    #         self.cfl = cfl(self)
-    #         assert self.cfl < 1., "CFL condition violated."
+    def _check_cfl(self):
+        """
+        Assert that the CFL number is less than unity.
+        """
+        if self.timestepper.tn % 10 == 0:
+            self._update_fields()
+            self.cfl = cfl(self)
+            assert self.cfl < 1., "CFL condition violated."
 
     def run(self):
         """Run model until final time.
         """
         self._update_fields()
         while (self.timestepper.t < self.timestepper.T):
-            # self._check_cfl()
+            self._check_cfl()
             self._evolve_one_step()
             if self.timestepper.tn % 1000 == 0:
                 print(f"Time: {self.timestepper.t:.2f}")
