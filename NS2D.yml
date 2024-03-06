@@ -1,0 +1,13 @@
+name: NS2D
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - numpy
+  - scipy=1.9.3
+  - fftw=3.3.10
+  - pyfftw=0.12.0
+  - pandas
+  - matplotlib
+  - ipykernel
