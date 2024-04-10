@@ -3,12 +3,13 @@ Base module for defining model.
 """
 
 import pyfftw
+import multiprocessing
 import numpy as np
 from spatial_statistics import cfl
 from pathlib import Path
-fftw = pyfftw.interfaces.numpy_fft
-pyfftw.config.NUM_THREADS = 8
+pyfftw.config.NUM_THREADS = multiprocessing.cpu_count()
 pyfftw.interfaces.cache.enable()
+fftw = pyfftw.interfaces.numpy_fft
 
 
 class Model:
