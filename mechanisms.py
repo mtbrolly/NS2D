@@ -2,15 +2,15 @@
 Mechanisms to be implemented in a `Model` instance.
 
 TODO:
-    - Tidy up advection and make sure dealiasing is correct.
     - Generalise stochastic forcing and improve docstrings.
 """
 
 import pyfftw
+import multiprocessing
 import numpy as np
-fftw = pyfftw.interfaces.numpy_fft
-pyfftw.config.NUM_THREADS = 8
+pyfftw.config.NUM_THREADS = multiprocessing.cpu_count()
 pyfftw.interfaces.cache.enable()
+fftw = pyfftw.interfaces.numpy_fft
 
 
 class SpectralFilter:
@@ -135,14 +135,16 @@ class Diffusion:
 
     def __init__(self, model, order=1., coefficient=None):
         self.model = model
-        if order >= 0.:
+        self.order = order
+        self.coefficient = coefficient
+        if self.order >= 0.:
             self.n_order_visc = np.exp(
-                -coefficient * self.model.timestepper.dt
-                * self.model.wv2 ** order)
+                -self.coefficient * self.model.timestepper.dt
+                * self.model.wv2 ** self.order)
         else:
             self.n_order_visc = np.exp(
-                -coefficient * self.model.timestepper.dt
-                * self.model.wv2i ** (-order))
+                -self.coefficient * self.model.timestepper.dt
+                * self.model.wv2i ** (-self.order))
 
     def __call__(self):
         self.model.zk *= self.n_order_visc
@@ -166,18 +168,26 @@ class StochasticRingForcing:
     """
     solution_mode = 'discrete'
 
-    def __init__(self, model, k_f, dk_f, a_f, seed=1):
+    def __init__(self, model, k_f, dk_f, energy_input_rate, seed=1):
         self.model = model
         self.k_f = k_f
         self.dk_f = dk_f
-        self.a_f = a_f
+        self.energy_input_rate = energy_input_rate
         self.rng = np.random.default_rng(seed=seed)
-        F = ((self.model.wv >= self.k_f - self.dk_f)
-             & (self.model.wv <= self.k_f + self.dk_f)) * self.a_f
-        self.fk_vars = F / ((self.model.wv + (self.model.wv == 0)) * np.pi) / 2
+        self.band_filter = ((self.model.wv >= self.k_f - self.dk_f)
+                            & (self.model.wv <= self.k_f + self.dk_f))
+        self.band_filter = self.band_filter
+        self.F = self.band_filter * self.energy_input_rate
+        self.fk_vars = self.F * self.model.n_x ** 2 * self.model.wv2
+        # Accounting for band filter:
+        # self.fk_vars *= np.prod(self.model.kx.shape) / self.band_filter.sum()
+        # The above and making isotropic energy of forcing flat within interval
+        self.fk_vars *= self.model.wv2i ** 0.5
+        self.fk_vars /= np.sum(2 * self.band_filter * self.model.wv2i ** 0.5
+                               ) / (self.model.n_x ** 2)
 
     def __call__(self):
         self.fk = np.reshape(self.rng.normal(size=self.model.wv.size)
                              + 1j * self.rng.normal(size=self.model.wv.size),
-                             self.model.wv.shape) * np.sqrt(self.fk_vars)
-        self.model.zk += self.fk
+                             self.model.wv.shape) * self.fk_vars ** 0.5
+        self.model.zk += self.fk * self.model.timestepper.dt ** 0.5
