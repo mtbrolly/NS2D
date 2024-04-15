@@ -176,15 +176,9 @@ class StochasticRingForcing:
         self.rng = np.random.default_rng(seed=seed)
         self.band_filter = ((self.model.wv >= self.k_f - self.dk_f)
                             & (self.model.wv <= self.k_f + self.dk_f))
-        self.band_filter = self.band_filter
-        self.F = self.band_filter * self.energy_input_rate
-        self.fk_vars = self.F * self.model.n_x ** 2 * self.model.wv2
-        # Accounting for band filter:
-        # self.fk_vars *= np.prod(self.model.kx.shape) / self.band_filter.sum()
-        # The above and making isotropic energy of forcing flat within interval
-        self.fk_vars *= self.model.wv2i ** 0.5
-        self.fk_vars /= np.sum(2 * self.band_filter * self.model.wv2i ** 0.5
-                               ) / (self.model.n_x ** 2)
+        self.fk_vars = (self.energy_input_rate * self.band_filter
+                        * self.model.n_x ** 4 * self.model.wv * 0.5
+                        / np.sum(self.band_filter * self.model.wv2i ** 0.5))
 
     def __call__(self):
         self.fk = np.reshape(self.rng.normal(size=self.model.wv.size)
