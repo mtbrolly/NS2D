@@ -21,12 +21,14 @@ class Model:
         n_x,
         mechanisms=None,
         timestepper=None,
-        data_dir=None
+        data_dir=None,
+        data_interval=100,
     ):
         self.n_x = n_x
         self.mechanisms = mechanisms
         self.timestepper = timestepper
         self.data_dir = data_dir
+        self.data_interval = data_interval
         self._construct_grids()
         self._create_data_dir()
 
@@ -61,10 +63,13 @@ class Model:
         """Evolve model one time step.
         """
         self.psik = -self.wv2i * self.zk
-
+        approximate_mode_mechanisms = False
         for mechanism in self.mechanisms:
             if mechanism.solution_mode == 'approximate':
                 mechanism()
+                approximate_mode_mechanisms = True
+        if not approximate_mode_mechanisms:
+            self.rhs = 0.
         self.timestepper.step()
         for mechanism in self.mechanisms:
             if mechanism.solution_mode == 'discrete':
@@ -100,7 +105,7 @@ class Model:
         while (self.timestepper.t < self.timestepper.T):
             self._check_cfl()
             self._evolve_one_step()
-            if self.timestepper.tn % 1000 == 0:
+            if self.timestepper.tn % self.data_interval == 0:
                 print(f"Time: {self.timestepper.t:.2f}")
                 if self.data_dir:
                     self._save_data()
