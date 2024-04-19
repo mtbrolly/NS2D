@@ -1,8 +1,5 @@
 """
 Mechanisms to be implemented in a `Model` instance.
-
-TODO:
-    - Generalise stochastic forcing and improve docstrings.
 """
 
 import pyfftw
@@ -11,26 +8,6 @@ import numpy as np
 pyfftw.config.NUM_THREADS = multiprocessing.cpu_count()
 pyfftw.interfaces.cache.enable()
 fftw = pyfftw.interfaces.numpy_fft
-
-
-class SpectralFilter:
-    """Exponential spectral filter for applying highly scale-selective but
-    non-physical dissipation at small scales.
-    """
-    solution_mode = 'exact'
-
-    def __init__(self, model):
-        filterfac = 23.6
-        cphi = 0.65 * np.pi
-        wvx = np.sqrt(
-            (model.kx * model.dx) ** 2. + (model.k_y * model.dx) ** 2.)
-        exp_filter = np.exp(-filterfac * (wvx - cphi) ** 4.)
-        exp_filter[wvx <= cphi] = 1.
-        self.exp_filter = exp_filter
-        self.model = model
-
-    def __call__(self):
-        self.model.zk *= self.exp_filter
 
 
 class Advection:
@@ -127,9 +104,9 @@ class DealiasedAdvection:
 
 class Diffusion:
     """Diffusion with `order` to be specified. Order refers to the power of the
-    Laplacian. `order=1.` gives standard Newtonian viscosity; `order>2.` gives
+    Laplacian. `order=1.` gives standard Newtonian viscosity; `order>1.` gives
     hyperviscosity; `order=0.` gives linear drag; `order=-1.` gives
-    large-scale friction, etc.
+    large-scale/hyper friction, etc.
     """
     solution_mode = 'exact'
 
@@ -138,33 +115,36 @@ class Diffusion:
         self.order = order
         self.coefficient = coefficient
         if self.order >= 0.:
-            self.n_order_visc = np.exp(
+            self.multiplier = np.exp(
                 -self.coefficient * self.model.timestepper.dt
                 * self.model.wv2 ** self.order)
         else:
-            self.n_order_visc = np.exp(
+            self.multiplier = np.exp(
                 -self.coefficient * self.model.timestepper.dt
                 * self.model.wv2i ** (-self.order))
 
     def __call__(self):
-        self.model.zk *= self.n_order_visc
+        self.model.zk *= self.multiplier
 
 
 class Beta:
     """Beta plane.
     """
-    solution_mode = 'approximate'
+    solution_mode = 'exact'
 
     def __init__(self, model, beta):
         self.model = model
         self.beta = beta
+        self.solution_multiplier = np.exp(self.model.timestepper.dt * self.beta
+                                          * self.model.ikx * self.model.wv2i)
 
     def __call__(self):
-        self.model.rhs -= self.beta * (self.model.ikx * self.model.psik)
+        self.model.zk *= self.solution_multiplier
 
 
 class StochasticRingForcing:
-    """White-in-time stochastic forcing. Details to follow.
+    """White-in-time stochastic forcing concentrated on a band of wavenumbers.
+    Energy is input at a mean rate which is uniform across forced wavenumbers.
     """
     solution_mode = 'discrete'
 
@@ -185,3 +165,23 @@ class StochasticRingForcing:
                              + 1j * self.rng.normal(size=self.model.wv.size),
                              self.model.wv.shape) * self.fk_vars ** 0.5
         self.model.zk += self.fk * self.model.timestepper.dt ** 0.5
+
+
+class SpectralFilter:
+    """Exponential spectral filter for applying highly scale-selective but
+    non-physical dissipation at small scales.
+    """
+    solution_mode = 'exact'
+
+    def __init__(self, model):
+        filterfac = 23.6
+        cphi = 0.65 * np.pi
+        wvx = np.sqrt(
+            (model.kx * model.dx) ** 2. + (model.ky * model.dx) ** 2.)
+        exp_filter = np.exp(-filterfac * (wvx - cphi) ** 4.)
+        exp_filter[wvx <= cphi] = 1.
+        self.exp_filter = exp_filter
+        self.model = model
+
+    def __call__(self):
+        self.model.zk *= self.exp_filter

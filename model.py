@@ -64,17 +64,17 @@ class Model:
         """
         self.psik = -self.wv2i * self.zk
         approximate_mode_mechanisms = False
-        for mechanism in self.mechanisms:
+        for _, mechanism in self.mechanisms.items():
             if mechanism.solution_mode == 'approximate':
                 mechanism()
                 approximate_mode_mechanisms = True
         if not approximate_mode_mechanisms:
             self.rhs = 0.
         self.timestepper.step()
-        for mechanism in self.mechanisms:
+        for _, mechanism in self.mechanisms.items():
             if mechanism.solution_mode == 'discrete':
                 mechanism()
-        for mechanism in self.mechanisms:
+        for _, mechanism in self.mechanisms.items():
             if mechanism.solution_mode == 'exact':
                 mechanism()
 

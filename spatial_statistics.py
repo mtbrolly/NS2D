@@ -1,8 +1,5 @@
 """
 A module for computing spatial statistics of a `Model` instance.
-
-TODO:
-    - Add function for computing a set of statistics for a full dataset.
 """
 
 import numpy as np
@@ -18,10 +15,10 @@ def spectral_variance(model, fk):
     fk.
     """
 
-    var_dens = 2. * np.abs(fk) ** 2 / model.n_x ** 4
+    var_dens = 2. * np.abs(fk) ** 2
     var_dens[..., 0] /= 2
     var_dens[..., -1] /= 2
-    return var_dens.sum(axis=(-1, -2))
+    return var_dens.sum(axis=(-1, -2)) / model.n_x ** 4
 
 
 def energy(model):
@@ -30,8 +27,14 @@ def energy(model):
     return 0.5 * spectral_variance(model, model.wv * model.psik)
 
 
+def energy_via_vorticity(model):
+    """Calculate mean energy per unit area using zk.
+    """
+    return 0.5 * spectral_variance(model, model.zk * model.wv2i ** 0.5)
+
+
 def enstrophy(model):
-    """Calculate mean enstrophy per unit area using psik.
+    """Calculate mean enstrophy per unit area using zk.
     """
     return 0.5 * spectral_variance(model, model.zk)
 
@@ -103,8 +106,33 @@ def eddy_turnover_time(model):
     return 2 * np.pi / np.sqrt(enstrophy(model))
 
 
+def velocity_kurtosis(model):
+    """Calculate the kurtosis of the velocity field (u component only).
+    """
+    return np.mean(model.u ** 4) / np.var(model.u) ** 2
+
+
+def vorticity_kurtosis(model):
+    """Calculate the vorticity of the vorticity field.
+    """
+    return np.mean(model.z ** 4) / np.var(model.z) ** 2
+
+
+def reynolds_number(model):
+    """Calculate Reynold's number.
+    """
+    return np.sqrt(np.mean(model.u ** 2 + model.v ** 2)) / (
+        energy_centroid(model) * model.mechanisms['viscosity'].coefficient)
+
+
+def energy_dissipation_due_to_viscosity(model):
+    """Calculate rate of energy dissipation per unit time due to viscosity.
+    """
+    return 2 * model.mechanisms['viscosity'].coefficient * enstrophy(model)
+
+
 def time_series(data_dir, n_x, twrite, n_snapshots):
-    """Calculate and save time series of some specified statistics for data"""
+    """Calculate and save time series of some specified statistics."""
     m = Model(n_x)
     E = []
     Z = []
