@@ -1,38 +1,57 @@
 from model import Model
 from timesteppers import AB3
-from mechanisms import (DealiasedAdvection,
-                        Diffusion, StochasticRingForcing)
+import mechanisms
 from random_fields import JMcW
+from pathlib import Path
 import plots
 import spatial_statistics
+import pickle
 from time import time
 
-m = Model(256, data_dir="data/stationary/")
-m.timestepper = AB3(m, 1e-3, 1000.)
-m.mechanisms = (
-    DealiasedAdvection(m),
-    StochasticRingForcing(m, 4, 1, 1e7),
-    Diffusion(m, order=-1., coefficient=1.5),
-    Diffusion(m, coefficient=1.5e-3)
-    )
+run = "demo"
 
-m.zk = JMcW(m)  # np.zeros_like(m.kx)
+# Define model.
+m = Model(1024, data_dir="data/" + run + "/", data_interval=100)
+m.timestepper = AB3(m, 5e-4, 100.)
+m.mechanisms = {
+    'advection': mechanisms.DealiasedAdvection(m),
+    'forcing': mechanisms.StochasticRingForcing(m, 90, 2, 1e-2),
+    'friction': mechanisms.Diffusion(m, order=0., coefficient=1e-2),
+    'hyperviscosity': mechanisms.Diffusion(m, order=2, coefficient=1e-9),
+                }
 
+# Specify initial condition.
+m.zk = JMcW(m)
+
+
+# Run the model.
 t0 = time()
 m.run()
 t1 = time()
 t_run = t1 - t0
 print(f"Time taken: {t_run} seconds")
-print(f"CFL: {m.cfl:.4f}")
-ETT = spatial_statistics.eddy_turnover_time(m)
-print(f"Eddy turnover time: {ETT:.2f}")
 
+
+# Print some statistics of the final snapshot.
+print(f"CFL: {m.cfl:.4f}")
+print(f"Eddy turnover time: {spatial_statistics.eddy_turnover_time(m):.2f}")
+print(f"Energy = {spatial_statistics.energy(m):.4f}")
+
+
+# Save model.
 m._update_fields()
-fig_folder = "figures/stationary/"
-suffix = f"_{m.timestepper.t:.0f}"
+with open(m.data_dir + r"m.pkl", "wb") as file:
+    pickle.dump(m, file)
+
+
+# Produce some figures.
+fig_folder = "figures/" + run + "/"
+if not Path(fig_folder).exists():
+    Path(fig_folder).mkdir(parents=True)
+suffix = f"_{m.timestepper.tn:.0f}"
 plots.plot_vorticity_field(
-    m, filename=fig_folder + "z" + suffix + ".png")
+    m, filename=fig_folder + "z" + suffix + ".png", halfrange=None)
 plots.plot_isotropic_energy_spectrum(
-    m, filename=fig_folder + "E" + suffix + ".png", ymin=None)
+    m, filename=fig_folder + "E" + suffix + ".png", ymin=1e-12)
 plots.plot_isotropic_enstrophy_spectrum(
-    m, filename=fig_folder + "Z" + suffix + ".png", ymin=None)
+    m, filename=fig_folder + "Z" + suffix + ".png", ymin=1e-8)
