@@ -2,11 +2,12 @@
 Base module for defining model.
 """
 
-import cupy as np
+import cupy as cp
 from spatial_statistics_gpu import cfl
 from pathlib import Path
 import cupyx.scipy.fft as cufft
 import scipy.fft
+import pickle
 scipy.fft.set_global_backend(cufft)
 fft_lib = scipy.fft
 
@@ -22,12 +23,24 @@ class Model:
         timestepper=None,
         data_dir=None,
         data_interval=100,
+        precision='double'
     ):
         self.n_x = n_x
         self.mechanisms = mechanisms
         self.timestepper = timestepper
         self.data_dir = data_dir
         self.data_interval = data_interval
+        if precision == 'double':
+            self.real_dtype = 'float64'
+            self.complex_dtype = 'complex128'
+        elif precision == 'single':
+            self.real_dtype = 'float32'
+            self.complex_dtype = 'complex64'
+        elif precision == 'half':
+            self.real_dtype = 'float16'
+            self.complex_dtype = 'complex32'
+        else:
+            return
         self._construct_grids()
         self._create_data_dir()
 
@@ -36,26 +49,27 @@ class Model:
         [0, 2pi]^2 with grid points at the centres of a uniform rectangular
         mesh.
         """
-        L = 2 * np.pi
-        self.x, self.y = np.meshgrid(
-            L * np.arange(0.5, self.n_x) / self.n_x,
-            L * np.arange(0.5, self.n_x) / self.n_x)
+        L = 2 * cp.pi
+        self.x, self.y = cp.meshgrid(
+            L * cp.arange(0.5, self.n_x, dtype=self.real_dtype) / self.n_x,
+            L * cp.arange(0.5, self.n_x, dtype=self.real_dtype) / self.n_x)
         self.dx = L / self.n_x
 
         self.n_kx = self.n_x // 2 + 1
-        self.kx = np.arange(0., self.n_kx)
-        self.ky = np.append(np.arange(0., self.n_x / 2),
-                            np.arange(-self.n_x / 2, 0.))
+        self.kx = cp.arange(0., self.n_kx, dtype=self.real_dtype)
+        self.ky = cp.append(
+            cp.arange(0., self.n_x / 2, dtype=self.real_dtype),
+            cp.arange(-self.n_x / 2, 0., dtype=self.real_dtype))
 
-        self.kx, self.ky = np.meshgrid(self.kx, self.ky)
+        self.kx, self.ky = cp.meshgrid(self.kx, self.ky)
 
         self.ikx = 1j * self.kx
         self.iky = 1j * self.ky
 
         self.wv2 = self.kx ** 2 + self.ky ** 2
-        self.wv = np.sqrt(self.wv2)
+        self.wv = cp.sqrt(self.wv2)
 
-        self.wv2i = np.zeros_like(self.wv2)
+        self.wv2i = cp.zeros_like(self.wv2, dtype=self.real_dtype)
         self.wv2i[self.wv2 != 0.] = self.wv2[self.wv2 != 0.] ** -1
 
     def _evolve_one_step(self):
@@ -120,4 +134,20 @@ class Model:
         """
         Save model field data.
         """
-        np.save(self.data_dir + f"zk_{self.timestepper.tn:.0f}.npy", self.zk)
+        cp.save(self.data_dir + f"zk_{self.timestepper.tn:.0f}.npy", self.zk)
+
+    def save_model(self):
+        """Save Model instance.
+        """
+        self._update_fields()
+        for (k, v) in self.__dict__.items():
+            if isinstance(v, cp.ndarray):
+                v = v.get()
+        for _, object in self.mechanisms.items():
+            for (k, v) in object.__dict__.items():
+                if isinstance(v, cp.ndarray):
+                    v = v.get()
+        if 'forcing' in self.mechanisms:
+            del self.mechanisms['forcing'].rng
+        with open(self.data_dir + r"m.pkl", "wb") as file:
+            pickle.dump(self, file)

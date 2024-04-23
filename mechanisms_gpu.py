@@ -69,15 +69,20 @@ class DealiasedAdvection:
                     int(self.model.n_x * (self.pad - 0.5)):] = False
 
     def __call__(self):
-        self.nlk = cp.zeros(self.model.zk.shape, dtype='complex128')
+        self.nlk = cp.zeros(self.model.zk.shape,
+                            dtype=self.model.complex_dtype)
         self.model.uk = -self.model.iky * self.model.psik
         self.model.vk = self.model.ikx * self.model.psik
 
         # Create padded arrays
-        self.uk_padded = cp.zeros((self.m_x, self.m_k), dtype='complex128')
-        self.vk_padded = cp.zeros((self.m_x, self.m_k), dtype='complex128')
-        self.z_xk_padded = cp.zeros((self.m_x, self.m_k), dtype='complex128')
-        self.z_yk_padded = cp.zeros((self.m_x, self.m_k), dtype='complex128')
+        self.uk_padded = cp.zeros((self.m_x, self.m_k),
+                                  dtype=self.model.complex_dtype)
+        self.vk_padded = cp.zeros((self.m_x, self.m_k),
+                                  dtype=self.model.complex_dtype)
+        self.z_xk_padded = cp.zeros((self.m_x, self.m_k),
+                                    dtype=self.model.complex_dtype)
+        self.z_yk_padded = cp.zeros((self.m_x, self.m_k),
+                                    dtype=self.model.complex_dtype)
 
         # Enter known coefficients, leaving padded entries equal to zero
         self.uk_padded[self.padder, :self.model.n_kx] = self.model.uk[:, :]
@@ -160,9 +165,11 @@ class StochasticRingForcing:
                         / cp.sum(self.band_filter * self.model.wv2i ** 0.5))
 
     def __call__(self):
-        self.fk = cp.reshape(self.rng.standard_normal(size=self.model.wv.size)
+        self.fk = cp.reshape(self.rng.standard_normal(
+            size=self.model.wv.size, dtype=self.model.real_dtype)
                              + 1j * self.rng.standard_normal(
-                                 size=self.model.wv.size),
+                                 size=self.model.wv.size,
+                                 dtype=self.model.real_dtype),
                              self.model.wv.shape) * self.fk_vars ** 0.5
         self.model.zk += self.fk * self.model.timestepper.dt ** 0.5
 

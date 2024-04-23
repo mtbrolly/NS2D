@@ -18,7 +18,7 @@ def spectral_variance(model, fk):
     var_dens = 2. * cp.abs(fk) ** 2
     var_dens[..., 0] /= 2
     var_dens[..., -1] /= 2
-    return var_dens.sum(axis=(-1, -2)) / model.n_x ** 4
+    return var_dens.sum(axis=(-1, -2), dtype=model.real_dtype) / model.n_x ** 4
 
 
 def energy(model):
@@ -119,10 +119,19 @@ def vorticity_kurtosis(model):
 
 
 def reynolds_number(model):
-    """Calculate Reynold's number.
+    """Calculate Reynolds number.
     """
     return cp.sqrt(cp.mean(model.u ** 2 + model.v ** 2)) / (
         energy_centroid(model) * model.mechanisms['viscosity'].coefficient)
+
+
+def hyper_reynolds_number(model):
+    """Reynolds number-like number for simulations with hyperviscosity.
+    """
+    return (cp.sqrt(cp.mean(model.u ** 2 + model.v ** 2))
+            * (energy_centroid(model) ** -1.
+               ) ** (2 * model.mechanisms['viscosity'].order - 1)
+            / model.mechanisms['viscosity'].coefficient)
 
 
 def energy_dissipation_due_to_viscosity(model):
