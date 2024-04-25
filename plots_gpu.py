@@ -32,6 +32,22 @@ def plot_vorticity_field(model, halfrange=None, filename='figures/tmp_z.png',
     plt.close()
 
 
+def plot_stream_function(model, halfrange=None, filename='figures/tmp_psi.png',
+                         cmap='RdBu'):
+    """Plot the stream function.
+    """
+    fig, ax = plt.subplots()
+    ax.pcolormesh(model.x.get(), model.y.get(), model.psi.get(),
+                  norm=mpl.colors.CenteredNorm(halfrange=halfrange),
+                  cmap=cmap)
+    ax.set_xlim(0., 2. * cp.pi)
+    ax.set_ylim(0., 2. * cp.pi)
+    ax.set_aspect('equal')
+    fig.tight_layout()
+    plt.savefig(filename, dpi=576)
+    plt.close()
+
+
 def plot_vorticity_field_upscalef(model, halfrange=None, upscale_factor=4,
                                   filename='figures/tmp_z.png', cmap='RdBu'):
     """Plot the vorticity field.
@@ -79,7 +95,7 @@ def plot_speed_field(model, filename='figures/tmp_speed.png'):
 
 
 def plot_isotropic_energy_spectrum(model, filename='figures/tmp_E.png',
-                                   ymin=None):
+                                   ymin=None, ymax=None):
     """Plot the isotropic energy spectrum.
     """
     kr, spec_iso = spatial_statistics_gpu.isotropic_energy_spectrum(model)
@@ -88,7 +104,7 @@ def plot_isotropic_energy_spectrum(model, filename='figures/tmp_E.png',
     ax.loglog(kr.get(), kr.get() ** -(5 / 3), 'g--')
     ax.loglog(kr.get(), kr.get() ** -3, 'b--')
     ax.loglog(kr.get(), kr.get() ** -2, 'r--')
-    ax.set_ylim(ymin, None)
+    ax.set_ylim(ymin, ymax)
     ax.set_xlabel(r"$k$")
     ax.set_ylabel(r"$E(k)$")
     ax.grid(True)
@@ -98,7 +114,7 @@ def plot_isotropic_energy_spectrum(model, filename='figures/tmp_E.png',
 
 
 def plot_isotropic_enstrophy_spectrum(model, filename='figures/tmp_Z.png',
-                                      ymin=None):
+                                      ymin=None, ymax=None):
     """Plot the isotropic enstrophy spectrum.
     """
     kr, spec_iso = spatial_statistics_gpu.isotropic_enstrophy_spectrum(model)
@@ -107,7 +123,7 @@ def plot_isotropic_enstrophy_spectrum(model, filename='figures/tmp_Z.png',
     ax.loglog(kr.get(), kr.get() ** +(1 / 3), 'g--')
     ax.loglog(kr.get(), kr.get() ** -1, 'b--')
     ax.loglog(kr.get(), kr.get() ** 0., 'r--')
-    ax.set_ylim(ymin, None)
+    ax.set_ylim(ymin, ymax)
     ax.set_xlabel(r"$k$")
     ax.set_ylabel(r"$Z(k)$")
     ax.grid(True)

@@ -140,6 +140,13 @@ def energy_dissipation_due_to_viscosity(model):
     return 2 * model.mechanisms['viscosity'].coefficient * enstrophy(model)
 
 
+def energy_dissipation_due_to_hypoviscosity(model):
+    """Calculate rate of energy dissipation per unit time due to hypoviscosity.
+    """
+    return model.mechanisms['friction'].coefficient * spectral_variance(
+        model, model.psik)
+
+
 def time_series(data_dir, n_x, twrite, n_snapshots):
     """Calculate and save time series of some specified statistics."""
     m = Model(n_x)

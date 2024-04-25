@@ -152,25 +152,25 @@ class StochasticRingForcing:
     """
     solution_mode = 'discrete'
 
-    def __init__(self, model, k_f, dk_f, energy_icput_rate, seed=1):
+    def __init__(self, model, k_f, dk_f, energy_input_rate, seed=1):
         self.model = model
         self.k_f = k_f
         self.dk_f = dk_f
-        self.energy_icput_rate = energy_icput_rate
+        self.energy_input_rate = energy_input_rate
         self.rng = cp.random.default_rng(seed=seed)
         self.band_filter = ((self.model.wv >= self.k_f - self.dk_f)
                             & (self.model.wv <= self.k_f + self.dk_f))
-        self.fk_vars = (self.energy_icput_rate * self.band_filter
+        self.fk_vars = (self.energy_input_rate * self.band_filter
                         * self.model.n_x ** 4 * self.model.wv * 0.5
                         / cp.sum(self.band_filter * self.model.wv2i ** 0.5))
 
     def __call__(self):
         self.fk = cp.reshape(self.rng.standard_normal(
             size=self.model.wv.size, dtype=self.model.real_dtype)
-                             + 1j * self.rng.standard_normal(
-                                 size=self.model.wv.size,
-                                 dtype=self.model.real_dtype),
-                             self.model.wv.shape) * self.fk_vars ** 0.5
+            + 1j * self.rng.standard_normal(
+            size=self.model.wv.size,
+            dtype=self.model.real_dtype),
+            self.model.wv.shape) * self.fk_vars ** 0.5
         self.model.zk += self.fk * self.model.timestepper.dt ** 0.5
 
 

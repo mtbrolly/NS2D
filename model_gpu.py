@@ -115,6 +115,7 @@ class Model:
         """Run model until final time.
         """
         self._update_fields()
+        self._save_data()
         while (self.timestepper.t < self.timestepper.T):
             self._check_cfl()
             self._evolve_one_step()
