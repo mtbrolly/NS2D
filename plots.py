@@ -1,28 +1,44 @@
 """Plotting functions for standard plots.
-
-TODO:
-    - Add a function for producing videos.
 """
 
-import pyfftw
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import numpy as np
 import spatial_statistics
-from scipy.interpolate import RegularGridInterpolator
-fftw = pyfftw.interfaces.numpy_fft
+import cupy as cp
+import cupyx.scipy.fft as cufft
+import scipy.fft
+from model import Model
+scipy.fft.set_global_backend(cufft)
+fft_lib = scipy.fft
 plt.ioff()
 
 
-def plot_vorticity_field(model, halfrange=None, filename='figures/tmp_z.png'):
+def plot_vorticity_field(model, halfrange=None, filename='figures/tmp_z.png',
+                         cmap='RdBu'):
     """Plot the vorticity field.
     """
     fig, ax = plt.subplots()
-    ax.pcolormesh(model.x, model.y, model.z,
+    ax.pcolormesh(model.x.get(), model.y.get(), model.z.get(),
                   norm=mpl.colors.CenteredNorm(halfrange=halfrange),
-                  cmap='RdBu')
-    ax.set_xlim(0., 2. * np.pi)
-    ax.set_ylim(0., 2. * np.pi)
+                  cmap=cmap)
+    ax.set_xlim(0., 2. * cp.pi)
+    ax.set_ylim(0., 2. * cp.pi)
+    ax.set_aspect('equal')
+    fig.tight_layout()
+    plt.savefig(filename, dpi=576)
+    plt.close()
+
+
+def plot_stream_function(model, halfrange=None, filename='figures/tmp_psi.png',
+                         cmap='RdBu'):
+    """Plot the stream function.
+    """
+    fig, ax = plt.subplots()
+    ax.pcolormesh(model.x.get(), model.y.get(), model.psi.get(),
+                  norm=mpl.colors.CenteredNorm(halfrange=halfrange),
+                  cmap=cmap)
+    ax.set_xlim(0., 2. * cp.pi)
+    ax.set_ylim(0., 2. * cp.pi)
     ax.set_aspect('equal')
     fig.tight_layout()
     plt.savefig(filename, dpi=576)
@@ -30,63 +46,22 @@ def plot_vorticity_field(model, halfrange=None, filename='figures/tmp_z.png'):
 
 
 def plot_vorticity_field_upscale(model, halfrange=None, upscale_factor=4,
-                                 filename='figures/tmp_z.png'):
-    """Plot the vorticity field.
+                                 filename='figures/tmp_z.png', cmap='RdBu'):
+    """Plot the vorticity field using zero-padding in Fourier space to
+    upscale by a specified factor in physical space.
     """
-    x_l = model.x[0]
-    y_l = model.y[:, 0]
-    x_lp = np.concatenate(
-        (x_l[0:1] - (x_l[1] - x_l[0]), x_l, x_l[-1:] + (x_l[1] - x_l[0])))
-    y_lp = np.concatenate(
-        (y_l[0:1] - (y_l[1] - y_l[0]), y_l, y_l[-1:] + (y_l[1] - y_l[0])))
-    z_lp = np.pad(model.z, pad_width=1, mode='wrap')
-    interp = RegularGridInterpolator((x_lp, y_lp), z_lp, method='linear')
-    L = 2 * np.pi
-    n_x = upscale_factor * model.n_x
-    x, y = np.meshgrid(
-        L * np.arange(0.5, n_x) / n_x,
-        L * np.arange(0.5, n_x) / n_x)
-    z = interp(
-        np.concatenate((x.reshape((-1, 1)), y.reshape((-1, 1))), axis=1)
-        ).reshape(x.shape)
+    m_up = Model(n_x=model.n_x * upscale_factor, precision=model.precision)
+    filter = low_pass_spatial_filter(m_up, model.n_x)
+    m_up.zk = cp.zeros_like(m_up.wv, dtype=model.complex_dtype)
+    m_up.zk[filter] = model.zk.flatten() / (model.n_x / m_up.n_x) ** 2
+    m_up._update_fields()
+
     fig, ax = plt.subplots()
-    ax.pcolormesh(x, y, z,
+    ax.pcolormesh(m_up.x.get(), m_up.y.get(), m_up.z.get(),
                   norm=mpl.colors.CenteredNorm(halfrange=halfrange),
-                  cmap='RdBu')
-    ax.set_xlim(0., 2. * np.pi)
-    ax.set_ylim(0., 2. * np.pi)
-    ax.set_aspect('equal')
-    fig.tight_layout()
-    plt.savefig(filename, dpi=576)
-    plt.close()
-
-
-def plot_vorticity_field_upscalef(model, halfrange=None, upscale_factor=4,
-                                  filename='figures/tmp_z.png'):
-    """Plot the vorticity field.
-    """
-    pad = upscale_factor
-    m_x = int(pad * model.n_x)
-    m_k = m_x // 2 + 1
-    padder = np.ones(m_x, dtype=bool)
-    padder[int(model.n_x / 2):
-           int(model.n_x * (pad - 0.5)):] = False
-    zk_padded = np.zeros((m_x, m_k), dtype='complex128')
-    zk_padded[padder, :model.n_kx] = (
-        model.zk)[:, :] * pad ** 2
-    z_up = fftw.irfft2(zk_padded)
-
-    L = 2 * np.pi
-    n_x = upscale_factor * model.n_x
-    x, y = np.meshgrid(
-        L * np.arange(0.5, n_x) / n_x,
-        L * np.arange(0.5, n_x) / n_x)
-    fig, ax = plt.subplots()
-    ax.pcolormesh(x, y, z_up,
-                  norm=mpl.colors.CenteredNorm(halfrange=halfrange),
-                  cmap='RdBu')
-    ax.set_xlim(0., 2. * np.pi)
-    ax.set_ylim(0., 2. * np.pi)
+                  cmap=cmap)
+    ax.set_xlim(0., 2. * cp.pi)
+    ax.set_ylim(0., 2. * cp.pi)
     ax.set_aspect('equal')
     fig.tight_layout()
     plt.savefig(filename, dpi=576)
@@ -94,13 +69,13 @@ def plot_vorticity_field_upscalef(model, halfrange=None, upscale_factor=4,
 
 
 def plot_speed_field(model, filename='figures/tmp_speed.png'):
-    """Plot the vorticity field.
+    """Plot speed.
     """
     fig, ax = plt.subplots()
     ax.pcolormesh(model.x, model.y, (model.u ** 2 + model.v ** 2) ** 0.5,
                   vmin=0., cmap='Greys_r')
-    ax.set_xlim(0., 2. * np.pi)
-    ax.set_ylim(0., 2. * np.pi)
+    ax.set_xlim(0., 2. * cp.pi)
+    ax.set_ylim(0., 2. * cp.pi)
     ax.set_aspect('equal')
     fig.tight_layout()
     plt.savefig(filename, dpi=576)
@@ -108,16 +83,16 @@ def plot_speed_field(model, filename='figures/tmp_speed.png'):
 
 
 def plot_isotropic_energy_spectrum(model, filename='figures/tmp_E.png',
-                                   ymin=None):
+                                   ymin=None, ymax=None):
     """Plot the isotropic energy spectrum.
     """
     kr, spec_iso = spatial_statistics.isotropic_energy_spectrum(model)
     fig, ax = plt.subplots()
-    ax.loglog(kr, spec_iso, 'k')
-    ax.loglog(kr, kr ** -(5 / 3), 'g--')
-    ax.loglog(kr, kr ** -3, 'b--')
-    ax.loglog(kr, kr ** -2, 'r--')
-    ax.set_ylim(ymin, None)
+    ax.loglog(kr.get(), spec_iso.get(), 'k')
+    ax.loglog(kr.get(), kr.get() ** -(5 / 3), 'g--')
+    ax.loglog(kr.get(), kr.get() ** -3, 'b--')
+    ax.loglog(kr.get(), kr.get() ** -2, 'r--')
+    ax.set_ylim(ymin, ymax)
     ax.set_xlabel(r"$k$")
     ax.set_ylabel(r"$E(k)$")
     ax.grid(True)
@@ -127,16 +102,16 @@ def plot_isotropic_energy_spectrum(model, filename='figures/tmp_E.png',
 
 
 def plot_isotropic_enstrophy_spectrum(model, filename='figures/tmp_Z.png',
-                                      ymin=None):
+                                      ymin=None, ymax=None):
     """Plot the isotropic enstrophy spectrum.
     """
     kr, spec_iso = spatial_statistics.isotropic_enstrophy_spectrum(model)
     fig, ax = plt.subplots()
-    ax.loglog(kr, spec_iso, 'k')
-    ax.loglog(kr, kr ** +(1 / 3), 'g--')
-    ax.loglog(kr, kr ** -1, 'b--')
-    ax.loglog(kr, kr ** 0., 'r--')
-    ax.set_ylim(ymin, None)
+    ax.loglog(kr.get(), spec_iso.get(), 'k')
+    ax.loglog(kr.get(), kr.get() ** +(1 / 3), 'g--')
+    ax.loglog(kr.get(), kr.get() ** -1, 'b--')
+    ax.loglog(kr.get(), kr.get() ** 0., 'r--')
+    ax.set_ylim(ymin, ymax)
     ax.set_xlabel(r"$k$")
     ax.set_ylabel(r"$Z(k)$")
     ax.grid(True)
@@ -165,3 +140,10 @@ def plot_zonally_averaged_velocity(model, filename='figures/tmp_ubar.png'):
     fig.tight_layout()
     plt.savefig(filename, dpi=576)
     plt.close()
+
+
+def low_pass_spatial_filter(model, new_n_x):
+    """ Construct a low pass filter.
+    """
+    kmax = new_n_x // 2
+    return (model.kx <= kmax) * (model.ky <= kmax) * (-model.ky < kmax)

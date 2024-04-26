@@ -2,7 +2,7 @@
 A module for computing spatial statistics of a `Model` instance.
 """
 
-import numpy as np
+import cupy as cp
 if __name__ == "__main__":
     from model import Model
 
@@ -15,10 +15,10 @@ def spectral_variance(model, fk):
     fk.
     """
 
-    var_dens = 2. * np.abs(fk) ** 2
+    var_dens = 2. * cp.abs(fk) ** 2
     var_dens[..., 0] /= 2
     var_dens[..., -1] /= 2
-    return var_dens.sum(axis=(-1, -2)) / model.n_x ** 4
+    return var_dens.sum(axis=(-1, -2), dtype=model.real_dtype) / model.n_x ** 4
 
 
 def energy(model):
@@ -42,33 +42,33 @@ def enstrophy(model):
 def cfl(model):
     """Calculate Courant-Friedrichs-Lewy number.
     """
-    return np.abs(
-        np.hstack([model.u, model.v])).max() * model.timestepper.dt / model.dx
+    return cp.abs(
+        cp.hstack([model.u, model.v])).max() * model.timestepper.dt / model.dx
 
 
 def energy_spectrum(model):
     """Calculate 2D energy spectrum from psik.
     """
-    return model.wv2 * np.abs(model.psik) ** 2 / model.n_x ** 4
+    return model.wv2 * cp.abs(model.psik) ** 2 / model.n_x ** 4
 
 
 def enstrophy_spectrum(model):
     """Calculate 2D enstrophy spectrum from zk.
     """
-    return np.abs(model.zk) ** 2 / model.n_x ** 4
+    return cp.abs(model.zk) ** 2 / model.n_x ** 4
 
 
 def isotropic_spectrum(model, spectrum):
     """Calculate an isotropic spectrum from a 2D spectrum.
     """
     kmax = model.kx.max()
-    dkr = np.sqrt(2.)
-    kr = np.arange(dkr / 2., kmax + dkr, dkr)
-    iso_spec = np.zeros(kr.size)
+    dkr = cp.sqrt(2.)
+    kr = cp.arange(dkr.get() / 2., kmax.get() + dkr.get(), dkr.get())
+    iso_spec = cp.zeros(kr.size)
 
     for i in range(kr.size):
         fkr = (model.wv >= kr[i] - dkr / 2) & (model.wv <= kr[i] + dkr / 2)
-        dtk = np.pi / (fkr.sum() - 1)
+        dtk = cp.pi / (fkr.sum() - 1)
         iso_spec[i] = spectrum[fkr].sum() * kr[i] * dtk
 
     return kr, iso_spec
@@ -90,39 +90,48 @@ def energy_centroid(model):
     """Calculate energy centroid.
     """
     kr, iso_spec = isotropic_energy_spectrum(model)
-    return np.sum(kr * iso_spec) / energy(model)
+    return cp.sum(kr * iso_spec) / energy(model)
 
 
 def enstrophy_centroid(model):
     """Calculate enstrophy centroid.
     """
     kr, iso_spec = isotropic_enstrophy_spectrum(model)
-    return np.sum(kr * iso_spec) / enstrophy(model)
+    return cp.sum(kr * iso_spec) / enstrophy(model)
 
 
 def eddy_turnover_time(model):
     """Calculate eddy turnover time.
     """
-    return 2 * np.pi / np.sqrt(enstrophy(model))
+    return 2 * cp.pi / cp.sqrt(enstrophy(model))
 
 
 def velocity_kurtosis(model):
     """Calculate the kurtosis of the velocity field (u component only).
     """
-    return np.mean(model.u ** 4) / np.var(model.u) ** 2
+    return cp.mean(model.u ** 4) / cp.var(model.u) ** 2
 
 
 def vorticity_kurtosis(model):
     """Calculate the vorticity of the vorticity field.
     """
-    return np.mean(model.z ** 4) / np.var(model.z) ** 2
+    return cp.mean(model.z ** 4) / cp.var(model.z) ** 2
 
 
 def reynolds_number(model):
-    """Calculate Reynold's number.
+    """Calculate Reynolds number.
     """
-    return np.sqrt(np.mean(model.u ** 2 + model.v ** 2)) / (
+    return cp.sqrt(cp.mean(model.u ** 2 + model.v ** 2)) / (
         energy_centroid(model) * model.mechanisms['viscosity'].coefficient)
+
+
+def hyper_reynolds_number(model):
+    """Reynolds number-like number for simulations with hyperviscosity.
+    """
+    return (cp.sqrt(cp.mean(model.u ** 2 + model.v ** 2))
+            * (energy_centroid(model) ** -1.
+               ) ** (2 * model.mechanisms['viscosity'].order - 1)
+            / model.mechanisms['viscosity'].coefficient)
 
 
 def energy_dissipation_due_to_viscosity(model):
@@ -131,15 +140,22 @@ def energy_dissipation_due_to_viscosity(model):
     return 2 * model.mechanisms['viscosity'].coefficient * enstrophy(model)
 
 
+def energy_dissipation_due_to_hypoviscosity(model):
+    """Calculate rate of energy dissipation per unit time due to hypoviscosity.
+    """
+    return model.mechanisms['friction'].coefficient * spectral_variance(
+        model, model.psik)
+
+
 def time_series(data_dir, n_x, twrite, n_snapshots):
     """Calculate and save time series of some specified statistics."""
     m = Model(n_x)
     E = []
     Z = []
     for i in range(1, n_snapshots + 1):
-        m.zk = np.load(data_dir + f"zk_{i * twrite}.npy")
+        m.zk = cp.load(data_dir + f"zk_{i * twrite}.npy")
         m._update_fields()
         E.append(energy(m))
         Z.append(enstrophy(m))
-    np.save(data_dir + "E.npy", E)
-    np.save(data_dir + "Z.npy", Z)
+    cp.save(data_dir + "E.npy", E)
+    cp.save(data_dir + "Z.npy", Z)
