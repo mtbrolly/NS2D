@@ -105,8 +105,7 @@ class Model:
         self.v = fft_lib.irfft2(self.vk)
 
     def _check_cfl(self):
-        """
-        Assert that the CFL number is less than unity.
+        """Assert that the CFL number is less than unity.
         """
         if self.timestepper.tn % 10 == 0:
             self._update_fields()
@@ -134,8 +133,7 @@ class Model:
             Path(self.data_dir).mkdir(parents=True)
 
     def _save_data(self):
-        """
-        Save model field data.
+        """Save model field data.
         """
         cp.save(self.data_dir + f"zk_{self.timestepper.tn:.0f}.npy", self.zk)
 

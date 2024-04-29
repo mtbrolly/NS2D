@@ -148,7 +148,7 @@ class Beta:
 
 class StochasticRingForcing:
     """White-in-time stochastic forcing concentrated on a band of wavenumbers.
-    Energy is icput at a mean rate which is uniform across forced wavenumbers.
+    Energy is input at a mean rate which is uniform across forced wavenumbers.
     """
     solution_mode = 'discrete'
 

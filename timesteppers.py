@@ -1,6 +1,5 @@
 """
-Timestepping schemes to be used together with a `Model` instance to form a
-`TimesteppedModel`.
+Timestepping schemes to be used together with a `Model` instance.
 """
 
 
