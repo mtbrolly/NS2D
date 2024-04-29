@@ -1,0 +1,15 @@
+# run: conda env create --file NS2D.yml
+
+# The version of cuda-version below must be compatible with the
+# drivers you have installed. Change as necessary.
+
+name: NS2D
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - cupy
+  - cuda-version=11.8
+  - scipy
+  - matplotlib

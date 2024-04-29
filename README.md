@@ -12,4 +12,4 @@ NS2D is a python package for simulating two-dimensional turbulence on the torus.
 
 NS2D borrows heavily from existing pseudo-spectral turbulence models, especially the [pyqg](https://github.com/pyqg) project. While it is currently a single layer model with a square domain, its extension to general rectangular n-layer configurations would likely be straightforward. 
 
-Note that an earlier CPU version of NS2D, which relies on [pyfftw](https://pyfftw.readthedocs.io/en/latest/), is available as [v1.0.0](https://github.com/mtbrolly/NS2D/releases/tag/v1.0.0).
+Note that an earlier (much slower) CPU version of NS2D, which relies on [pyfftw](https://pyfftw.readthedocs.io/en/latest/), is available as [v1.0.0](https://github.com/mtbrolly/NS2D/releases/tag/v1.0.0).
