@@ -2,10 +2,10 @@
 
 # NS2D (Navier--Stokes in two dimensions)
 
-NS2D is a python package for simulating two-dimensional turbulence on the torus. 
+NS2D is a Python package for simulating two-dimensional turbulence on the torus. 
 
 ## Why use this package?
-- *NS2D is extremely transparent*. The core modules are written in high-level python, meaning it's easy to see how the model works. Users specify explicitly which mechanisms they want in their model, such as types of dissipation and forcing, allowing for a range of model variations. In geophysical terms we solve the barotropic vorticity equation with the option of a beta plane configuration.
+- *NS2D is transparent*. The core modules are written in high-level Python, meaning it's easy to see how the model works. Users specify explicitly which mechanisms they want in their model, such as types of dissipation and forcing, allowing for a range of model variations. In geophysical terms we solve the barotropic vorticity equation with the option of a beta plane configuration.
 
 - *GPU compatibility*. NS2D runs on GPU. Pseudo-spectral solvers like this one rely on fast FFT implementations to be fast. Through [CuPy](https://cupy.dev/) we exploit NVIDIA's highly optimised [cuFFT](https://docs.nvidia.com/cuda/cufft/index.html) library without any complicated bookkeeping.
 

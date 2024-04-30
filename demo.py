@@ -5,9 +5,9 @@ A basic demonstration of running a simulation.
 import cupy as cp
 from model import Model
 from timesteppers import AB3
-import mechanisms as mechanisms
+import mechanisms
 from random_fields import JMcW
-import plots as plots
+import plots
 
 # Instantiate a model.
 m = Model(256, data_dir="data/demo/")
@@ -23,11 +23,15 @@ m.mechanisms = {
     'viscosity': mechanisms.Diffusion(m, order=1, coefficient=1e-3),
 }
 
+# Specify initial condition.
 m.zk = cp.asarray(JMcW(m))
 
+# Run the model.
 m.run()
 
+# Save (pickle) the model.
 m.save_model()
 
+# Plot some outputs/diagnostics.
 plots.plot_vorticity_field(m, filename="z.png")
 plots.plot_isotropic_energy_spectrum(m, filename="E.png")
